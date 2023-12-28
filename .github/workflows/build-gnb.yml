@@ -1,0 +1,92 @@
+name: 编译gnb
+
+on:
+  schedule:
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+env:
+  TZ: Asia/Shanghai
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      ver: ${{ steps.getversion.outputs.ver }}
+      cver: ${{ steps.getversion.outputs.cver }}
+    steps:
+      -
+        name: 检查更新
+        id: getversion
+        run: |
+          ver=`curl https://api.github.com/repos/gnbdev/opengnb/releases/latest | jq -r '.tag_name'`
+          cver=`curl https://api.github.com/repos/lmq8267/gnb/releases/latest | jq -r '.tag_name'`
+          echo "ver=${ver}" >> $GITHUB_OUTPUT
+          echo "cver=${cver}" >> $GITHUB_OUTPUT
+
+  build:
+    runs-on: ubuntu-latest
+    needs: check
+    if: ${{ needs.check.outputs.ver != needs.check.outputs.cver }}
+    steps:
+      -
+        name: 检查代码仓库
+        uses: actions/checkout@v3
+      - name: Init submodules
+        uses: snickerbockers/submodules-init@v4
+      - name: 编译
+        run: |
+          mkdir -p ./musl_gcc 
+          mkdir -p /opt/mipsel
+          sudo timedatectl set-timezone "Asia/Shanghai"
+          wget -q -c https://downloads.openwrt.org/releases/22.03.5/targets/ramips/mt7621/openwrt-toolchain-22.03.5-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64.tar.xz -P /opt/musl_gcc/
+          tar xJf /opt/musl_gcc/openwrt-toolchain-22.03.5-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64.tar.xz -C /opt/musl_gcc/
+          export CC=/opt/musl_gcc/openwrt-toolchain-22.03.5-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64/toolchain-mipsel_24kc_gcc-11.2.0_musl/bin/mipsel-openwrt-linux-musl-gcc
+          export LD=/opt/musl_gcc/openwrt-toolchain-22.03.5-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64/toolchain-mipsel_24kc_gcc-11.2.0_musl/bin/mipsel-openwrt-linux-musl-ld
+          export AR=/opt/musl_gcc/openwrt-toolchain-22.03.5-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64/toolchain-mipsel_24kc_gcc-11.2.0_musl/bin/mipsel-openwrt-linux-musl-ar
+          export RANLIB=/opt/musl_gcc/openwrt-toolchain-22.03.5-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64/toolchain-mipsel_24kc_gcc-11.2.0_musl/bin/mipsel-openwrt-linux-musl-ranlib
+          export STAGING_DIR=/opt/musl_gcc/openwrt-toolchain-22.03.5-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64/toolchain-mipsel_24kc_gcc-11.2.0_musl
+          git clone https://github.com/gnbdev/opengnb -b ${{ needs.check.outputs.ver }} /opt/gnb
+          git clone https://github.com/lmq8267/cloudflared.git /opt/st
+          tar -xvf /opt/st/upx-3.95-amd64_linux.tar.xz -C /opt
+          chmod 777 /opt/upx-3.95-amd64_linux/upx
+          cd /opt/gnb
+          sed -i 's|-L/usr/lib -pthread| -pthread -static|g' ./Makefile.openwrt
+          sed -i 's|-ffunction-sections|-ffunction-sections -static|g' ./Makefile.openwrt
+          make -f Makefile.openwrt
+          file gnb
+          mkdir -p ./upx
+          cp -rf gnb ./upx/gnb
+          cp -rf gnb_crypto ./upx/gnb_crypto
+          cp -rf gnb_ctl ./upx/gnb_ctl
+          cp -rf gnb_es ./upx/gnb_es
+          cd /opt/gnb/upx
+          /opt/musl_gcc/openwrt-toolchain-22.03.5-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64/toolchain-mipsel_24kc_gcc-11.2.0_musl/bin/mipsel-openwrt-linux-musl-strip /opt/gnb/upx/gnb_crypto
+          /opt/musl_gcc/openwrt-toolchain-22.03.5-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64/toolchain-mipsel_24kc_gcc-11.2.0_musl/bin/mipsel-openwrt-linux-musl-strip /opt/gnb/upx/gnb_ctl
+          /opt/musl_gcc/openwrt-toolchain-22.03.5-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64/toolchain-mipsel_24kc_gcc-11.2.0_musl/bin/mipsel-openwrt-linux-musl-strip /opt/gnb/upx/gnb_es
+          /opt/musl_gcc/openwrt-toolchain-22.03.5-ramips-mt7621_gcc-11.2.0_musl.Linux-x86_64/toolchain-mipsel_24kc_gcc-11.2.0_musl/bin/mipsel-openwrt-linux-musl-strip /opt/gnb/upx/gnb
+          /opt/upx-3.95-amd64_linux/upx --lzma --best gnb
+          /opt/upx-3.95-amd64_linux/upx --lzma --best gnb_crypto
+          /opt/upx-3.95-amd64_linux/upx --lzma --best gnb_ctl
+          /opt/upx-3.95-amd64_linux/upx --lzma --best gnb_es
+          cd /opt/gnb
+          cp -rf /opt/gnb/examples/node_config_example conf
+          tar czvf gnb-${{ needs.check.outputs.ver }}_musl_mipsel.tar.gz gnb_crypto gnb_ctl gnb_es gnb ./upx ./conf
+          echo "build_time=$(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
+      - name: 发布
+        uses: softprops/action-gh-release@v1
+        with:
+          token: ${{ secrets.c8 }}
+          body: |
+           > ### 编译时间 ：${{ env.build_time }}
+           
+           [官方更新说明](https://github.com/gnbdev/opengnb/releases)
+           
+          tag_name: ${{ needs.check.outputs.ver }}
+          files: /opt/gnb/gnb-${{ needs.check.outputs.ver }}_musl_mipsel.tar.gz
+      - 
+       name: 删除工作流
+       uses: GitRML/delete-workflow-runs@main
+       with:
+        token: ${{ secrets.c8 }}
+        retain_days: 2
+        keep_minimum_runs: 0
