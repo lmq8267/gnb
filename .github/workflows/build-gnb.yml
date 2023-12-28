@@ -81,7 +81,7 @@ jobs:
           body: |
            > ### 编译时间 ：${{ env.build_time }}
 
-           gnb-musl_mipsel.zip 二进制文件，其中upx为压缩版二进制文件减少体积占用
+           gnb-musl_mipsel.zip     二进制文件，其中upx为压缩版二进制文件减少体积占用
            opengnb-${{ needs.check.outputs.ver }}-src.zip 版本源码文件
            
            [官方更新说明](https://github.com/gnbdev/opengnb/releases)
