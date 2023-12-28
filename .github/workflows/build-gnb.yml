@@ -71,9 +71,8 @@ jobs:
           /opt/upx-3.95-amd64_linux/upx --lzma --best gnb_ctl
           /opt/upx-3.95-amd64_linux/upx --lzma --best gnb_es
           cd /opt/gnb
-          cp -rf /opt/gnb/examples/node_config_example node_config_example
           #tar czvf gnb-${{ needs.check.outputs.ver }}_musl_mipsel.tar.gz gnb_crypto gnb_ctl gnb_es gnb ./upx ./node_config_example
-          zip -r gnb-musl_mipsel.zip gnb_crypto gnb_ctl gnb_es gnb upx node_config_example
+          zip -r gnb-musl_mipsel.zip gnb_crypto gnb_ctl gnb_es gnb upx /opt/gnb/examples/node_config_example
           echo "build_time=$(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
       - name: 发布
         uses: softprops/action-gh-release@v1
@@ -89,7 +88,7 @@ jobs:
            
           tag_name: ${{ needs.check.outputs.ver }}
           files: |
-           /opt/gnb/gnb-${{ needs.check.outputs.ver }}_musl_mipsel.zip
+           /opt/gnb/gnb-musl_mipsel.zip
            /opt/opengnb-${{ needs.check.outputs.ver }}-src.zip
       - 
        name: 删除工作流
