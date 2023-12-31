@@ -76,7 +76,7 @@ jobs:
           prerelease: true
           files: |
            /opt/gnb/gnb-musl_mipsel.zip
-           /opt/opengnb-${{ needs.check.outputs.ver }}-src.zip
+           /opt/opengnb-${{env.TAG}}-src.zip
       - 
        name: 删除工作流
        uses: GitRML/delete-workflow-runs@main
