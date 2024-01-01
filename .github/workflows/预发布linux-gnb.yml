@@ -189,7 +189,7 @@ jobs:
           body: |
            > ### 编译时间 ：${{ env.build_time }}
            
-           gnb-musl-linux_**.zip     二进制文件，其中upx为压缩版二进制文件减少体积占用
+           gnb-musl-**.zip     二进制文件，其中upx为压缩版二进制文件减少体积占用
            opengnb-${{env.TAG}}-src.zip 版本源码文件
 
            lite模式增加到50个节点[（1001|10.1.0.1|255.255.0.0 至 1050|10.1.0.50|255.255.0.0）](https://github.com/gnbdev/opengnb/blob/25ff34122f9f5ef73d84e38efed4ebb8944051f4/src/gnb_config_lite.c#L325C48-L325C73)
